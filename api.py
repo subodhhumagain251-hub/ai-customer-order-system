@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException,status 
 from orders_manager import(
     
      load_orders,
@@ -54,11 +54,11 @@ def get_order(order_id: int):
     found = find_order_by_id(orders,order_id)
 
     if found is None:
-        return{"error": "orders not found"}
+       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found")
     else:
         return found
 
-@app.post("/orders")
+@app.post("/orders",status_code=status.HTTP_201_CREATED)
 def create_order(new_order: OrderCreate):
     orders=load_orders("orders.json")
 
@@ -86,8 +86,7 @@ def chage_order_status(order_id:int ,update_data: StatusUpdate):
     orders=load_orders("orders.json")
     existing_order= find_order_by_id(orders,order_id)
     if existing_order is None:
-        return{"error":"order Not found"}
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found")
     orders=update_order_status(orders,order_id,update_data.status)
     save_orders("orders.json",orders)
 
@@ -103,7 +102,7 @@ def cancel_order(order_id:int):
 
     existing =find_order_by_id(orders,order_id)
     if existing is None:
-        return{"error":"order not found"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found")
     orders=delete_order_by_id(orders,order_id)
     save_orders("orders.json",orders)
 
