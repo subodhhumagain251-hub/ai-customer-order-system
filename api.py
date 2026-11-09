@@ -1,110 +1,83 @@
-from fastapi import FastAPI,HTTPException,status 
-from orders_manager import(
-    
-     load_orders,
-     save_orders,
-     calculate_metrics,
-     find_order_by_id,
-     add_orders,
-     update_order_status,
-     delete_order_by_id
-     )
-from pydantic import BaseModel
+from fastapi import FastAPI ,HTTPException,status
+from pydantic import BaseModel 
+from database import(
+
+    init_db,
+    add_order_to_db,
+    create_order_with_inventory,
+    get_all_orders,
+    get_order_by_id,
+    update_order_status,
+    delete_order, 
+    calculate_metrics_from_db
 
 
+)
 
-# Name the variable 'app':
+app =FastAPI()
 
 
-app = FastAPI()
-
+init_db()
 
 class OrderCreate(BaseModel):
-    customer : str
-    product : str 
-    quantity : int
-    price : float 
+    customer:str
+    product:str
+    quantity :int
+    
 
 class StatusUpdate(BaseModel):
-    status:str
+    status:str 
 
-
-@app.get("/")
-def home():
-    return {"message": "Welcome to the Customer Order API!"}
 
 @app.get("/orders")
-def get_all_orders():
-    orders = load_orders("orders.json")
-    return orders
+def get_orders():
+    return get_all_orders()
 
-@app.get("/subodh")
-def greeting():
-    return {"greetingd":"Namaste Subodh! I MADE THIS ROUTE MYSELF "} 
 
 @app.get("/metrics")
 def get_metrics():
-    orders=load_orders("orders.json")
-    metrics=calculate_metrics(orders)
-    return metrics
+    return calculate_metrics_from_db()
 
 @app.get("/orders/{order_id}")
-def get_order(order_id: int):
-    orders= load_orders("orders.json")
-    found = find_order_by_id(orders,order_id)
 
-    if found is None:
-       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found")
-    else:
-        return found
+def get_order(order_id: int):
+    found= get_order_by_id(order_id)
+    if found is None :
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found ")
+    return found 
+
+
+
 
 @app.post("/orders",status_code=status.HTTP_201_CREATED)
 def create_order(new_order: OrderCreate):
-    orders=load_orders("orders.json")
-
-    orders=add_orders(
-
-        orders,
-
-        new_order.customer,
-        new_order.product,
-        new_order.quantity,
-        new_order.price,
-      
+    if new_order.quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity and price must be greater than 0 ")
+ 
+    result= create_order_with_inventory(
+            new_order.customer,
+            new_order.product,
+            new_order.quantity,
     )
-
-    save_orders("orders.json",orders)
-    return{
-        "message":"order created sucessfully!",
-        "new_order":orders[-1]
-
-    }
-
+    print("DEBUG WHAT IS RESULT:",result)
+    
+    if result["success"]==False:
+        raise HTTPException(status_code=400,detail=result["error"])
+    
+    return {"message": "Order created successfully in SQL database!" , "order":result}
 
 @app.patch("/orders/{order_id}/status")
-def chage_order_status(order_id:int ,update_data: StatusUpdate):
-    orders=load_orders("orders.json")
-    existing_order= find_order_by_id(orders,order_id)
-    if existing_order is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found")
-    orders=update_order_status(orders,order_id,update_data.status)
-    save_orders("orders.json",orders)
-
-    return{
-        "message": "Order status updated successfully!",
-        "order_id" :order_id,
-        "new_status":update_data.status
-    }
+def change_order_status(order_id: int ,update_data:StatusUpdate):
+    updated =update_order_status(order_id,update_data.status)
+    if not updated:
+        raise HTTPException (status_code=400,detail="Order not found")
+    return {"message": "Order status updated successfully in database!",
+            "order_id":order_id,
+            "new_status": update_data.status }
 
 @app.delete("/orders/{order_id}")
-def cancel_order(order_id:int):
-    orders=load_orders("orders.json")
-
-    existing =find_order_by_id(orders,order_id)
-    if existing is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Order not found")
-    orders=delete_order_by_id(orders,order_id)
-    save_orders("orders.json",orders)
-
-    return{"message":f"order {order_id} has been deleted sucessfully!",
-           "remaining_Order":len(orders)}
+def cancel_order(order_id: int):
+    deleted = delete_order(order_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return {"message": f"Order {order_id} has been deleted successfully from database!"}
