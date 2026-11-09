@@ -192,7 +192,7 @@ The system validates the request, generates an order ID, and assigns the default
 - Pydantic schemas
 - Standard HTTP status codes
 
-### ⬜ Stage 3 — SQL Database Migration
+### ✅ Stage 3 — SQL Database Migration
 Move from flat JSON storage to a relational database such as **SQLite** or **PostgreSQL**, with transaction support.
 
 ### ⬜ Stage 4 — Workflow Automation
