@@ -67,7 +67,7 @@ def create_order_with_inventory(customer,product_name,quantity):
 
     if product is None:
         conn.close()
-        return{"Sucess": False,"error":"Product not found in store catalog"}
+        return{"success": False,"error":"Product not found in store catalog"}
 
     if product["stock"] < quantity:
         conn.close()

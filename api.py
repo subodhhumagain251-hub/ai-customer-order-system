@@ -1,5 +1,6 @@
 from fastapi import FastAPI ,HTTPException,status
 from pydantic import BaseModel 
+from ai_extractor import extract_order_from_txt 
 from database import(
 
     init_db,
@@ -28,7 +29,28 @@ class OrderCreate(BaseModel):
 class StatusUpdate(BaseModel):
     status:str 
 
+class NaturalOrderRequest(BaseModel):
+    message:str 
 
+@app.post("/orders/ai",
+          status_code=status.HTTP_201_CREATED)
+def create_ai_order(payload:NaturalOrderRequest):
+    extracted=extract_order_from_txt(payload.message)
+
+    if not extracted.get("is_order",False):
+        raise HTTPException(status_code=400,detail='Message is not an order request.')
+    result= create_order_with_inventory(
+        extracted["customer"],
+        extracted["product"],
+        extracted["quantity"],
+                  
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400,detail=result["error"])
+    return {"message": "AI order created successfully!", "order": result}
+
+
+    
 @app.get("/orders")
 def get_orders():
     return get_all_orders()
@@ -64,13 +86,14 @@ def create_order(new_order: OrderCreate):
     if result["success"]==False:
         raise HTTPException(status_code=400,detail=result["error"])
     
+    
     return {"message": "Order created successfully in SQL database!" , "order":result}
 
 @app.patch("/orders/{order_id}/status")
 def change_order_status(order_id: int ,update_data:StatusUpdate):
     updated =update_order_status(order_id,update_data.status)
     if not updated:
-        raise HTTPException (status_code=400,detail="Order not found")
+        raise HTTPException (status_code=404,detail="Order not found")
     return {"message": "Order status updated successfully in database!",
             "order_id":order_id,
             "new_status": update_data.status }
