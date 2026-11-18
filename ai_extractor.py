@@ -19,7 +19,11 @@ Our store sells these exact products: {catalog_names}
 
 Analyze the customer message to extract what they want to order. Match their item to the closest exact product name from our catalog list above when possible.
 You must respond ONLY with a raw JSON object with these exact keys:
-- "is_order": boolean (true if the customer wants to buy/order something, false if just greeting or asking a question)
+- "intent": string — must be ONLY one of:
+    "ORDER" (customer clearly wants to buy AND named a specific product)
+    "INCOMPLETE" (customer wants to buy, but did not name a specific product)
+    "INQUIRY" (customer is just greeting or asking a question)
+- "is_order": boolean (true ONLY if intent is "ORDER", otherwise false)
 - "customer": string (the customer's name, or "Customer" if not mentioned)
 - "product": string (the exact product name from our catalog if it matches, otherwise the item they asked for, or "" if not an order)
 - "quantity": integer (number of items as an integer, default to 1 if not specified)
@@ -30,7 +34,7 @@ Do not add any explanation or markdown formatting. Output pure JSON only."""
         model="openai/gpt-oss-20b",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message},
+            {"role": "user", "content": str(message)},
         ],
         response_format={"type": "json_object"},
         temperature=0.0,
@@ -50,7 +54,7 @@ Do not add any explanation or markdown formatting. Output pure JSON only."""
 
 
 if __name__ == "__main__":
-    sample_message = "Hello! My name is Bikash .can i please order 2 Black Hoodies?"
+    sample_message = "I want to order 2 Black Hoodies, my name is Suman."
     print("Customer Message:", sample_message)
     order_data = extract_order_from_txt(sample_message)
     print("\nExtracted Data from AI:")

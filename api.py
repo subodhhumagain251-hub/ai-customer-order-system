@@ -1,16 +1,19 @@
-from fastapi import FastAPI ,HTTPException,status
+from fastapi import FastAPI ,HTTPException,status,Response
 from pydantic import BaseModel 
 from ai_extractor import extract_order_from_txt 
+
 from database import(
 
     init_db,
     add_order_to_db,
     create_order_with_inventory,
+    get_all_products,
     get_all_orders,
     get_order_by_id,
     update_order_status,
     delete_order, 
     calculate_metrics_from_db
+    
 
 
 )
@@ -32,24 +35,35 @@ class StatusUpdate(BaseModel):
 class NaturalOrderRequest(BaseModel):
     message:str 
 
-@app.post("/orders/ai",
-          status_code=status.HTTP_201_CREATED)
-def create_ai_order(payload:NaturalOrderRequest):
-    extracted=extract_order_from_txt(payload.message)
+@app.post("/orders/ai", status_code=status.HTTP_201_CREATED)
+def create_ai_order(payload: NaturalOrderRequest, response: Response):
+    extracted = extract_order_from_txt(payload.message)
+    intent = extracted.get("intent", "INQUIRY")
 
-    if not extracted.get("is_order",False):
-        raise HTTPException(status_code=400,detail='Message is not an order request.')
-    result= create_order_with_inventory(
+    if intent != "ORDER" or not extracted.get("product"):
+        response.status_code = status.HTTP_200_OK
+        products = get_all_products()
+        in_stock = [f"{p['name']} (Rs. {p['price']})" for p in products if p["stock"] > 0]
+        return {
+            "status": "clarification_needed",
+            "intent": intent,
+            "reply": f"Hi! Here is what we currently have in stock: {', '.join(in_stock)}. Which item and quantity would you like to order?",
+        }
+
+    result = create_order_with_inventory(
         extracted["customer"],
         extracted["product"],
         extracted["quantity"],
-                  
     )
     if not result["success"]:
-        raise HTTPException(status_code=400,detail=result["error"])
-    return {"message": "AI order created successfully!", "order": result}
+        raise HTTPException(status_code=400, detail=result["error"])
 
-
+    return {
+        "status": "order_created",
+        "message": "AI order created successfully!",
+        "reply": f"Thank you {result['customer']}! Order #{result['order_id']} for {result['quantity']}x {result['product']} is confirmed. Total: Rs. {result['total_price']}.",
+        "order": result,
+    }
     
 @app.get("/orders")
 def get_orders():
